@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tokyo"
+version = "0.1.0"
+description = "Tokyo: ASGI server and its respective minimalist web framework"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "Apache License 2.0"}
+authors = [
+    {name = "Aquiles-ai / Fredy", email = "riveraaai200678@gmail.com"}
+]
+keywords = [
+    "fastapi",
+    "ai", 
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Environment :: Web Environment",
+    "Topic :: Software Development :: Build Tools",
+]
+dependencies = [
+    "uvloop",
+    "httptools"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "isort",
+    "mypy",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["tokyo", "tokyo.*"]
+
+[tool.setuptools.package-data]
+"tokyo" = ["templates/**/*", "static/**/*"]
