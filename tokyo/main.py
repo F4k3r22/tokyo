@@ -1,8 +1,10 @@
 from typing import Callable, List, Optional
 from tokyo.models import Routes, Response, Request
+from tokyo.server import TokyoASGIServer
 import re
 import logging
 import inspect
+import uvloop
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +19,6 @@ class Tokyo:
 
         self.middlewares: List[Callable] = []
         self.name = name
-
-        logging.info(f"Launching App: {self.name}")
 
 
     def route(self, path: str, methods: List[str]):
@@ -150,10 +150,108 @@ class Tokyo:
                 return Response({"error": "Middleware error"}, 500)
         return None
 
-    async def _handle_request(self, request: Request): #-> Response: # Despues lo implemento, ya es tarde (Tambien deberia terminar de implementar el Response y Request)
+    async def _handle_request(self, request: Request)-> Response:
         # Maneja una petición completa
-        pass
 
-    def run(self, host: str = "localhost", port: int = 8000, use_uvloop: bool = True):
+        # Primero vamos a ejecutar las funciones de middlewares
+        middleware_response = await self._execute_middlewares(request)
+        if middleware_response:
+            return middleware_response
+
+        # Ok, ahora vamos a buscar la ruta, su metodo y sus parametros
+        # en dado caso que no se encuentre, retornamos un error 404 XD
+        route, path_params = self._find_route(request.path, request.method)
+        if not route:
+            return Response({"error": "Not Found", "path": request.path}, 404)
+
+        # inyectamos a la request los parametros obtenidos
+        request.path_params = path_params
+
+        # Ahora si ya manejamos la request
+        try:
+            # Obtenemos los parametros del handler 
+            sig = inspect.signature(route.handler)
+            kwargs = {}
+
+            # Aqui armamos el diccionario con todos los parametros y sus respectivos valores
+            # Para ejecutar el handler correctamente
+            for param_name, param in sig.parameters.items():
+                if param_name == 'request':
+                    kwargs['request'] = request
+                elif param_name in path_params:
+                    kwargs[param_name] = path_params[param_name]
+                elif param_name in request.query_params:
+                    # Convertir query param si es necesario
+                    value = request.query_params[param_name]
+                    if param.annotation == int:
+                        try:
+                            value = int(value)
+                        except:
+                            pass
+                    kwargs[param_name] = value
+
+            # Por si no queda claro, el handler es la función implementada en la ruta
+            # Es decir: 
+            # @app.post("/hello/{user:str}")
+            # async def hello(user: str)... <-- Este es el handler
+
+            # Ejecutar handler
+            result = route.handler(**kwargs)
+            if inspect.iscoroutine(result):
+                result = await result
+
+            if isinstance(result, Response):
+                return result
+            else:
+                return Response(result)
+
+            
+        except Exception as e:
+            logger.error(f"Error executing handler: {e}")
+            return Response({"error": "Internal Server Error", "details": str(e)}, 500)
+
+    async def __call__(self, scope: dict, receive: Callable, send: Callable):
+        # Interfaz basica ASGI del framework para actuar como una aplicación ASGI
+
+        if scope['type'] != 'http':
+            return
+
+        # Recibimos el body completo
+        body = b''
+        while True:
+            message = await receive()
+            if message['type'] == 'http.request':
+                body += message.get('body', b'')
+                if not message.get('more_body', False):
+                    break
+
+        # Creamos un objeto request para pasarlo al _handle_request 
+        request = Request(scope, body)
+
+        # Procesamos la request y mandamos la respuesta ya en el formato correcto
+        response = await self._handle_request(request)
+        asgi_response = response.to_asgi_response() # La clase Response ya formatea correctamente con el metodo to_asgi_response
+
+        # Enviar respuesta ASGI
+        await send({
+            'type': 'http.response.start',
+            'status': asgi_response['status'],
+            'headers': asgi_response['headers']
+        })
+        
+        await send({
+            'type': 'http.response.body',
+            'body': asgi_response['body']
+        })
+
+    def run(self, host: str = "localhost", port: int = 8000):
         # Ejecuta el servidor con uvloop + httptools
-        pass
+        logging.info(f"Launching App: {self.name}")
+        logging.info(f" Host: {host}:{port}")
+
+        async def start_server():
+            server  = TokyoASGIServer(self, host, port)
+            # Ya ponemos el servidor en escucha
+            await server.start()
+
+        uvloop.run(start_server())
