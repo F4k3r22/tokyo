@@ -20,7 +20,7 @@ def logging_md(request: Request):
     logger.info(f"{request.method} {request.path}")
 
 @app.post("/query")
-async def add(request: Request):
+async def query(request: Request):
     req = request.json()
 
     try:
