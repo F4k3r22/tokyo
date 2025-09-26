@@ -56,7 +56,7 @@ class Response:
             self.content_type = "text/plain"
 
     def to_asgi_response(self):
-        # Convierte a formato para ASGI
+        # Enviamos la respuesta en el formato correcto
         body = self.content.encode('utf-8')
         return {
             'status': self.status_code,
