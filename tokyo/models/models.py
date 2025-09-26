@@ -28,7 +28,7 @@ class Request:
             return {}
         # Parsing básico: key=value&key2=value2
         params = {}
-        for part in query_string.decode().split('&'): # Siempre va a tocar decodificar del formato ASGI para obtener todo lo necesario
+        for part in query_string.decode().split('&'): # Siempre va a tocar decodificar del formato ASCII para obtener todo lo necesario
             if '=' in part:
                 key, value = part.split('=', 1)
                 params[key] = value
