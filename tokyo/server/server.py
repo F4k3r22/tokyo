@@ -2,6 +2,7 @@ import httptools
 import asyncio
 import logging
 import multiprocessing
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,22 @@ class HTTPRequestHandler:
         self.complete = True
         # Programar procesamiento
         asyncio.create_task(self.server.process_request(self))
+
+class AsyncWorker:
+    def __init__(self, worker_id):
+        self.worker_id = worker_id
+        self.active_connections = 0
+        self.total_requests = 0
+        self.start_time = time.time()
+        
+        # Estadísticas
+        self.stats = {
+            'connections': 0,
+            'requests': 0,
+            'bytes_received': 0,
+            'bytes_sent': 0,
+            'errors': 0
+        }
 
 class TokyoASGIServer:
     """Servidor ASGI simple"""
